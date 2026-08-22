@@ -1,0 +1,916 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>우리집 외식일지</title>
+
+<!-- ===================== 설정 (여기만 수정하세요) ===================== -->
+<script>
+  const CONFIG = {
+    // Google Apps Script를 '웹 앱'으로 배포한 뒤 나오는 URL을 붙여넣으세요.
+    GAS_URL: 'YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL',
+    // 카카오 개발자센터에서 발급받은 JavaScript 키를 붙여넣으세요.
+    KAKAO_JS_KEY: 'YOUR_KAKAO_JAVASCRIPT_KEY'
+  };
+</script>
+<!-- ==================================================================== -->
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" />
+
+<style>
+  :root{
+    --paper:#FAF5EC;
+    --paper-deep:#F1E9D8;
+    --card:#FFFDF9;
+    --ink:#2A2320;
+    --ink-soft:#6B5F55;
+    --soy:#6B3623;
+    --soy-deep:#4E2519;
+    --sage:#6E8B5E;
+    --sage-deep:#4F6B42;
+    --yolk:#E3A83B;
+    --yolk-deep:#C4841E;
+    --line:#DDD0BC;
+    --danger:#B5482F;
+    --radius:14px;
+    --shadow: 0 2px 0 rgba(42,35,32,0.06), 0 8px 20px -12px rgba(42,35,32,0.25);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(1200px 500px at 10% -10%, #FFF9EE 0%, transparent 60%),
+      var(--paper);
+    color:var(--ink);
+    font-family:'Pretendard', -apple-system, sans-serif;
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+    padding-bottom:60px;
+  }
+  .serif{font-family:'Gowun Batang', serif;}
+
+  /* -------- shell -------- */
+  .shell{max-width:920px;margin:0 auto;padding:28px 18px 0;}
+  header.app-head{
+    display:flex; align-items:flex-end; justify-content:space-between;
+    padding-bottom:20px; margin-bottom:20px;
+    border-bottom:2px solid var(--ink);
+  }
+  header.app-head h1{
+    font-family:'Gowun Batang', serif;
+    font-size:clamp(26px,4vw,34px);
+    margin:0; letter-spacing:-0.01em; font-weight:700;
+  }
+  header.app-head .sub{color:var(--ink-soft); font-size:13px; margin-top:6px;}
+  .today{
+    font-size:12px; color:var(--ink-soft); text-align:right;
+    font-variant-numeric:tabular-nums;
+  }
+
+  /* -------- tabs styled like recipe index cards -------- */
+  .tabbar{display:flex; gap:8px; margin-bottom:0; position:relative; z-index:1;}
+  .tabbtn{
+    flex:1; text-align:center; cursor:pointer; user-select:none;
+    padding:12px 8px 14px; border:2px solid var(--ink); border-bottom:none;
+    border-radius:10px 10px 0 0;
+    background:var(--paper-deep); color:var(--ink-soft);
+    font-weight:700; font-size:14.5px;
+    transform:translateY(6px);
+    transition:transform .18s ease, background .18s ease, color .18s ease;
+  }
+  .tabbtn .emoji{display:block; font-size:18px; margin-bottom:2px;}
+  .tabbtn.active{
+    background:var(--card); color:var(--ink); transform:translateY(0);
+  }
+  .tabpanel-wrap{
+    background:var(--card); border:2px solid var(--ink); border-radius:0 10px 10px 10px;
+    box-shadow:var(--shadow); padding:26px 22px 30px; position:relative;
+  }
+  @media (max-width:560px){
+    .tabbtn .emoji{display:none;}
+    .tabpanel-wrap{padding:18px 14px 24px;}
+  }
+
+  .panel{display:none; animation:fade .25s ease;}
+  .panel.active{display:block;}
+  @keyframes fade{from{opacity:0; transform:translateY(4px);} to{opacity:1; transform:translateY(0);}}
+
+  h2.panel-title{
+    font-family:'Gowun Batang', serif; font-size:20px; margin:0 0 4px;
+  }
+  p.panel-desc{color:var(--ink-soft); font-size:13px; margin:0 0 22px;}
+
+  /* -------- form -------- */
+  .field{margin-bottom:16px;}
+  .field label{display:block; font-size:12.5px; font-weight:700; color:var(--ink-soft); margin-bottom:6px; letter-spacing:.01em;}
+  .row2{display:grid; grid-template-columns:1fr 1fr; gap:14px;}
+  .row3{display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px;}
+  @media (max-width:560px){ .row2,.row3{grid-template-columns:1fr;} }
+
+  input[type=text], input[type=number], input[type=datetime-local], textarea, select{
+    width:100%; padding:10px 12px; border:1.5px solid var(--line); border-radius:8px;
+    background:#fff; font-family:inherit; font-size:14px; color:var(--ink);
+    outline:none; transition:border-color .15s ease;
+  }
+  input:focus, textarea:focus, select:focus{border-color:var(--soy);}
+  textarea{resize:vertical; min-height:70px;}
+
+  .segbtns{display:flex; gap:8px; flex-wrap:wrap;}
+  .segbtn{
+    padding:9px 14px; border-radius:999px; border:1.5px solid var(--line);
+    background:#fff; cursor:pointer; font-size:13.5px; font-weight:600; color:var(--ink-soft);
+    transition:all .15s ease;
+  }
+  .segbtn.active{background:var(--soy); border-color:var(--soy); color:#fff;}
+
+  .stars{display:flex; gap:4px; font-size:26px; cursor:pointer;}
+  .stars span{color:var(--line); transition:color .12s ease, transform .12s ease;}
+  .stars span.filled{color:var(--yolk);}
+  .stars span:hover{transform:scale(1.15);}
+
+  .autocomplete-wrap{position:relative;}
+  .ac-list{
+    position:absolute; top:calc(100% + 4px); left:0; right:0; z-index:20;
+    background:#fff; border:1.5px solid var(--line); border-radius:8px; max-height:220px;
+    overflow-y:auto; box-shadow:var(--shadow); display:none;
+  }
+  .ac-list.show{display:block;}
+  .ac-item{padding:10px 12px; cursor:pointer; border-bottom:1px solid #F0EAE0; font-size:13.5px;}
+  .ac-item:last-child{border-bottom:none;}
+  .ac-item:hover{background:var(--paper-deep);}
+  .ac-item b{color:var(--soy);}
+  .ac-item .addr{display:block; color:var(--ink-soft); font-size:11.5px; margin-top:2px;}
+
+  .photo-drop{
+    border:1.5px dashed var(--line); border-radius:10px; padding:16px; text-align:center;
+    cursor:pointer; color:var(--ink-soft); font-size:13px; position:relative;
+  }
+  .photo-drop img{max-width:100%; max-height:160px; border-radius:8px; margin-top:10px;}
+
+  .btn{
+    display:inline-flex; align-items:center; gap:8px; justify-content:center;
+    padding:12px 22px; border-radius:10px; border:none; cursor:pointer;
+    font-weight:700; font-size:14.5px; font-family:inherit;
+    background:var(--soy); color:#fff; transition:background .15s ease, transform .1s ease;
+  }
+  .btn:hover{background:var(--soy-deep);}
+  .btn:active{transform:scale(.98);}
+  .btn.ghost{background:transparent; color:var(--soy); border:1.5px solid var(--soy);}
+  .btn.ghost:hover{background:#FBF0E9;}
+  .btn.sage{background:var(--sage);}
+  .btn.sage:hover{background:var(--sage-deep);}
+  .btn:disabled{opacity:.5; cursor:not-allowed;}
+
+  .status-msg{font-size:13px; margin-top:10px; min-height:18px;}
+  .status-msg.ok{color:var(--sage-deep);}
+  .status-msg.err{color:var(--danger);}
+
+  hr.divider{border:none; border-top:1px dashed var(--line); margin:28px 0;}
+
+  /* -------- recent list (tab1) -------- */
+  .mini-card{
+    display:flex; gap:12px; padding:12px; border:1px solid var(--line); border-radius:10px;
+    background:#fff; margin-bottom:10px; align-items:center;
+  }
+  .mini-card img{width:52px; height:52px; object-fit:cover; border-radius:8px; flex-shrink:0; background:var(--paper-deep);}
+  .mini-card .noimg{width:52px; height:52px; border-radius:8px; background:var(--paper-deep); flex-shrink:0;
+    display:flex; align-items:center; justify-content:center; font-size:20px;}
+  .mini-card .info{flex:1; min-width:0;}
+  .mini-card .info .name{font-weight:700; font-size:14px;}
+  .mini-card .info .meta{font-size:12px; color:var(--ink-soft); margin-top:2px;}
+  .tag{display:inline-block; padding:2px 8px; border-radius:999px; background:var(--paper-deep); font-size:11px; font-weight:700; color:var(--ink-soft); margin-right:4px;}
+
+  /* -------- dashboard (tab2) -------- */
+  .stat-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:24px;}
+  @media (max-width:640px){.stat-grid{grid-template-columns:repeat(2,1fr);}}
+  .stat-card{
+    background:var(--paper-deep); border-radius:10px; padding:14px; text-align:center;
+  }
+  .stat-card .num{font-family:'Gowun Batang',serif; font-size:22px; font-weight:700; color:var(--soy);}
+  .stat-card .lbl{font-size:11.5px; color:var(--ink-soft); margin-top:2px;}
+
+  .filter-bar{
+    display:flex; flex-wrap:wrap; gap:10px; align-items:flex-end;
+    background:var(--paper-deep); padding:14px; border-radius:10px; margin-bottom:22px;
+  }
+  .filter-bar .fitem{display:flex; flex-direction:column; gap:4px;}
+  .filter-bar .fitem label{font-size:11px; font-weight:700; color:var(--ink-soft);}
+  .filter-bar select, .filter-bar input{padding:7px 10px; font-size:13px;}
+  .filter-bar .fitem.grow{flex:1; min-width:140px;}
+
+  .chart-wrap{margin-bottom:26px;}
+  .chart-row{display:flex; align-items:center; gap:10px; margin-bottom:8px; font-size:12.5px;}
+  .chart-row .lbl{width:56px; flex-shrink:0; color:var(--ink-soft); font-weight:600;}
+  .chart-row .bar-bg{flex:1; height:16px; background:var(--paper-deep); border-radius:999px; overflow:hidden;}
+  .chart-row .bar-fill{height:100%; background:linear-gradient(90deg,var(--sage),var(--sage-deep)); border-radius:999px;}
+  .chart-row .val{width:34px; text-align:right; color:var(--ink-soft); flex-shrink:0;}
+
+  .visit-list{display:grid; grid-template-columns:1fr 1fr; gap:12px;}
+  @media (max-width:640px){.visit-list{grid-template-columns:1fr;}}
+  .visit-card{
+    border:1px solid var(--line); border-radius:12px; overflow:hidden; background:#fff;
+  }
+  .visit-card .thumb{width:100%; height:120px; object-fit:cover; background:var(--paper-deep); display:block;}
+  .visit-card .noimg-thumb{width:100%; height:120px; background:var(--paper-deep); display:flex; align-items:center; justify-content:center; font-size:30px;}
+  .visit-card .body{padding:12px;}
+  .visit-card .name{font-weight:700; font-size:14.5px;}
+  .visit-card .stars-mini{color:var(--yolk); font-size:13px; margin:4px 0;}
+  .visit-card .meta{font-size:12px; color:var(--ink-soft); line-height:1.6;}
+  .visit-card .review{font-size:12.5px; margin-top:6px; color:var(--ink); background:var(--paper); padding:8px; border-radius:6px;}
+
+  .empty-state{text-align:center; padding:40px 10px; color:var(--ink-soft);}
+  .empty-state .big{font-size:34px; margin-bottom:8px;}
+
+  /* -------- roulette (tab3) -------- */
+  .roulette-filters{
+    display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-bottom:22px;
+  }
+  @media (max-width:640px){.roulette-filters{grid-template-columns:1fr;}}
+
+  .wheel-zone{display:flex; flex-direction:column; align-items:center; gap:18px; padding:10px 0 4px;}
+  .wheel-holder{position:relative; width:min(320px,80vw); height:min(320px,80vw);}
+  .wheel-pointer{
+    position:absolute; top:-6px; left:50%; transform:translateX(-50%);
+    width:0; height:0; border-left:14px solid transparent; border-right:14px solid transparent;
+    border-top:22px solid var(--soy); z-index:5; filter:drop-shadow(0 2px 2px rgba(0,0,0,.25));
+  }
+  #wheelCanvas{width:100%; height:100%; border-radius:50%; box-shadow:var(--shadow); background:#fff;}
+  .wheel-hub{
+    position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+    width:44px; height:44px; border-radius:50%; background:var(--card);
+    border:3px solid var(--ink); display:flex; align-items:center; justify-content:center; font-size:18px;
+  }
+  .result-card{
+    width:100%; max-width:420px; text-align:center; padding:18px; border-radius:14px;
+    background:var(--paper-deep); border:2px dashed var(--soy); display:none;
+  }
+  .result-card.show{display:block; animation:fade .3s ease;}
+  .result-card .r-name{font-family:'Gowun Batang', serif; font-size:22px; font-weight:700; color:var(--soy-deep);}
+  .result-card .r-menu{font-size:14px; margin-top:6px;}
+  .result-card .r-menu b{color:var(--sage-deep);}
+  .result-card .r-meta{font-size:12px; color:var(--ink-soft); margin-top:6px;}
+
+  footer.app-foot{text-align:center; color:var(--ink-soft); font-size:11.5px; margin-top:36px;}
+</style>
+</head>
+<body>
+
+<div class="shell">
+  <header class="app-head">
+    <div>
+      <h1>🍚 우리집 외식일지</h1>
+      <div class="sub">먹은 곳, 먹은 맛, 오늘의 선택까지 — 가족의 외식 기록장</div>
+    </div>
+    <div class="today" id="todayLabel"></div>
+  </header>
+
+  <div class="tabbar">
+    <div class="tabbtn active" data-tab="record"><span class="emoji">✏️</span>외식기록</div>
+    <div class="tabbtn" data-tab="history"><span class="emoji">📊</span>방문이력</div>
+    <div class="tabbtn" data-tab="roulette"><span class="emoji">🎡</span>랜덤추천</div>
+  </div>
+
+  <div class="tabpanel-wrap">
+
+    <!-- ===================== TAB 1: 외식기록 ===================== -->
+    <section class="panel active" id="panel-record">
+      <h2 class="panel-title">오늘의 외식, 기록할까요?</h2>
+      <p class="panel-desc">먹은 곳과 메뉴, 별점을 남기면 방문이력과 랜덤추천에 자동으로 쌓여요.</p>
+
+      <form id="recordForm">
+        <div class="row2">
+          <div class="field">
+            <label>등록일시</label>
+            <input type="datetime-local" id="f_timestamp" required>
+          </div>
+          <div class="field">
+            <label>업종</label>
+            <div class="segbtns" id="f_category">
+              <div class="segbtn" data-val="한식">한식</div>
+              <div class="segbtn" data-val="중식">중식</div>
+              <div class="segbtn" data-val="일식">일식</div>
+              <div class="segbtn" data-val="기타">기타</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="field autocomplete-wrap">
+          <label>식당이름 <span style="font-weight:400;color:var(--ink-soft);">(입력하면 근처 식당을 찾아드려요)</span></label>
+          <input type="text" id="f_name" placeholder="예: 행복분식" autocomplete="off" required>
+          <div class="ac-list" id="acList"></div>
+        </div>
+
+        <div class="field">
+          <label>식당주소</label>
+          <input type="text" id="f_address" placeholder="식당이름 검색 시 자동 입력됩니다 (직접 입력 가능)">
+        </div>
+
+        <div class="row3">
+          <div class="field">
+            <label>선택메뉴</label>
+            <input type="text" id="f_menu" placeholder="예: 짬뽕, 탕수육">
+          </div>
+          <div class="field">
+            <label>인원</label>
+            <input type="number" id="f_people" min="1" value="4">
+          </div>
+          <div class="field">
+            <label>비용 (총액, 원)</label>
+            <input type="number" id="f_cost" min="0" step="1000" placeholder="예: 48000">
+          </div>
+        </div>
+
+        <div class="field">
+          <label>별점</label>
+          <div class="stars" id="f_stars">
+            <span data-v="1">★</span><span data-v="2">★</span><span data-v="3">★</span><span data-v="4">★</span><span data-v="5">★</span>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>후기</label>
+          <textarea id="f_review" placeholder="한 줄 후기를 남겨주세요"></textarea>
+        </div>
+
+        <div class="field">
+          <label>사진</label>
+          <div class="photo-drop" id="photoDrop">
+            <span id="photoDropLabel">탭해서 사진 선택 (선택사항)</span>
+            <input type="file" accept="image/*" id="f_photo" style="display:none;">
+            <div><img id="photoPreview" style="display:none;"></div>
+          </div>
+        </div>
+
+        <button type="submit" class="btn" id="submitBtn">기록 저장하기</button>
+        <div class="status-msg" id="formStatus"></div>
+      </form>
+
+      <hr class="divider">
+      <h2 class="panel-title" style="font-size:16px;">최근 기록</h2>
+      <div id="recentList"><p class="panel-desc">불러오는 중...</p></div>
+    </section>
+
+    <!-- ===================== TAB 2: 방문이력 ===================== -->
+    <section class="panel" id="panel-history">
+      <h2 class="panel-title">우리 가족 외식 대시보드</h2>
+      <p class="panel-desc">지금까지 쌓인 기록을 한눈에 확인하고 필터로 원하는 기록만 찾아보세요.</p>
+
+      <div class="stat-grid" id="statGrid"></div>
+
+      <div class="filter-bar">
+        <div class="fitem">
+          <label>업종</label>
+          <select id="filt_category"><option value="">전체</option><option>한식</option><option>중식</option><option>일식</option><option>기타</option></select>
+        </div>
+        <div class="fitem">
+          <label>별점</label>
+          <select id="filt_rating"><option value="0">전체</option><option value="5">★5</option><option value="4">★4 이상</option><option value="3">★3 이상</option></select>
+        </div>
+        <div class="fitem">
+          <label>비용(총액)</label>
+          <select id="filt_cost"><option value="">전체</option><option value="0-30000">3만원 이하</option><option value="30000-60000">3~6만원</option><option value="60000-999999999">6만원 이상</option></select>
+        </div>
+        <div class="fitem grow">
+          <label>메뉴 검색</label>
+          <input type="text" id="filt_menu" placeholder="예: 짬뽕">
+        </div>
+      </div>
+
+      <div class="chart-wrap" id="categoryChart"></div>
+
+      <div class="visit-list" id="visitList"></div>
+    </section>
+
+    <!-- ===================== TAB 3: 랜덤추천 ===================== -->
+    <section class="panel" id="panel-roulette">
+      <h2 class="panel-title">오늘 뭐 먹지? 🎡</h2>
+      <p class="panel-desc">조건은 직접 정하고, 식당과 메뉴는 룰렛에게 맡겨보세요.</p>
+
+      <div class="roulette-filters">
+        <div class="fitem">
+          <label>업종</label>
+          <select id="r_category"><option value="">전체</option><option>한식</option><option>중식</option><option>일식</option><option>기타</option></select>
+        </div>
+        <div class="fitem">
+          <label>예산 상한 (1인 총액 기준, 원)</label>
+          <input type="number" id="r_cost" placeholder="예: 50000" min="0" step="1000">
+        </div>
+        <div class="fitem">
+          <label>별점</label>
+          <select id="r_rating"><option value="0">전체</option><option value="3">★3 이상</option><option value="4">★4 이상</option><option value="5">★5만</option></select>
+        </div>
+      </div>
+
+      <button class="btn sage" id="buildWheelBtn" style="width:100%;margin-bottom:18px;">이 조건으로 룰렛 만들기</button>
+
+      <div class="wheel-zone" id="wheelZone" style="display:none;">
+        <div class="wheel-holder">
+          <div class="wheel-pointer"></div>
+          <canvas id="wheelCanvas" width="320" height="320"></canvas>
+          <div class="wheel-hub">🍽️</div>
+        </div>
+        <button class="btn" id="spinBtn">룰렛 돌리기</button>
+        <div class="result-card" id="resultCard">
+          <div class="r-name" id="resultName"></div>
+          <div class="r-menu">오늘의 메뉴는 <b id="resultMenu"></b></div>
+          <div class="r-meta" id="resultMeta"></div>
+        </div>
+      </div>
+
+      <div id="rouletteEmpty"></div>
+    </section>
+
+  </div>
+
+  <footer class="app-foot">가족 외식 기록 · Google Sheets에 안전하게 저장돼요</footer>
+</div>
+
+<script>
+/* =========================================================================
+   상태
+========================================================================= */
+let RECORDS = [];
+let selectedStar = 0;
+let selectedCategory = '';
+let selectedAddress = '';
+let photoBase64 = null;
+let wheelSegments = [];
+let wheelRotation = 0;
+let spinning = false;
+
+const $ = (sel) => document.querySelector(sel);
+const $$ = (sel) => Array.from(document.querySelectorAll(sel));
+
+/* =========================================================================
+   초기화
+========================================================================= */
+document.addEventListener('DOMContentLoaded', () => {
+  $('#todayLabel').textContent = new Date().toLocaleDateString('ko-KR', {year:'numeric',month:'long',day:'numeric',weekday:'short'});
+  $('#f_timestamp').value = toLocalInputValue(new Date());
+
+  initTabs();
+  initCategorySeg();
+  initStars();
+  initPhotoInput();
+  initAddressAutocomplete();
+  initForm();
+  initFilters();
+  initRoulette();
+  loadKakaoSdk();
+
+  fetchRecords();
+});
+
+function initTabs(){
+  $$('.tabbtn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      $$('.tabbtn').forEach(b=>b.classList.remove('active'));
+      $$('.panel').forEach(p=>p.classList.remove('active'));
+      btn.classList.add('active');
+      $('#panel-' + btn.dataset.tab).classList.add('active');
+      if(btn.dataset.tab === 'history') renderDashboard();
+    });
+  });
+}
+
+function toLocalInputValue(d){
+  const pad = n => String(n).padStart(2,'0');
+  return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+'T'+pad(d.getHours())+':'+pad(d.getMinutes());
+}
+
+/* =========================================================================
+   TAB1: 폼 입력
+========================================================================= */
+function initCategorySeg(){
+  $$('#f_category .segbtn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      $$('#f_category .segbtn').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      selectedCategory = btn.dataset.val;
+    });
+  });
+}
+
+function initStars(){
+  const spans = $$('#f_stars span');
+  spans.forEach(s=>{
+    s.addEventListener('click', ()=>{
+      selectedStar = parseInt(s.dataset.v);
+      spans.forEach(x=> x.classList.toggle('filled', parseInt(x.dataset.v) <= selectedStar));
+    });
+  });
+}
+
+function initPhotoInput(){
+  $('#photoDrop').addEventListener('click', ()=> $('#f_photo').click());
+  $('#f_photo').addEventListener('change', (e)=>{
+    const file = e.target.files[0];
+    if(!file) return;
+    resizeImageToBase64(file, 900, (dataUrl)=>{
+      photoBase64 = dataUrl;
+      $('#photoPreview').src = dataUrl;
+      $('#photoPreview').style.display = 'block';
+      $('#photoDropLabel').textContent = file.name;
+    });
+  });
+}
+
+function resizeImageToBase64(file, maxDim, cb){
+  const reader = new FileReader();
+  reader.onload = (e)=>{
+    const img = new Image();
+    img.onload = ()=>{
+      let w = img.width, h = img.height;
+      if(w > h && w > maxDim){ h = Math.round(h * maxDim/w); w = maxDim; }
+      else if(h > maxDim){ w = Math.round(w * maxDim/h); h = maxDim; }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      cb(canvas.toDataURL('image/jpeg', 0.82));
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function initAddressAutocomplete(){
+  let debounce;
+  $('#f_name').addEventListener('input', (e)=>{
+    clearTimeout(debounce);
+    const q = e.target.value.trim();
+    selectedAddress = ''; // 새로 타이핑하면 이전 선택 무효화
+    if(q.length < 2){ hideAcList(); return; }
+    debounce = setTimeout(()=> searchPlaces(q), 300);
+  });
+  document.addEventListener('click', (e)=>{
+    if(!$('#acList').contains(e.target) && e.target !== $('#f_name')) hideAcList();
+  });
+}
+
+function loadKakaoSdk(){
+  if(!CONFIG.KAKAO_JS_KEY || CONFIG.KAKAO_JS_KEY.indexOf('YOUR_') === 0) return;
+  const script = document.createElement('script');
+  script.src = 'https://dapi.kakao.com/v2/maps/sdk.js?appkey=' + CONFIG.KAKAO_JS_KEY + '&libraries=services&autoload=false';
+  script.onload = ()=> kakao.maps.load(()=>{ /* ready */ });
+  document.head.appendChild(script);
+}
+
+function searchPlaces(query){
+  if(typeof kakao === 'undefined' || !kakao.maps || !kakao.maps.services){
+    return; // 카카오 SDK 미설정 시 자동완성 없이 수동 입력만 지원
+  }
+  const places = new kakao.maps.services.Places();
+  places.keywordSearch(query, (data, status)=>{
+    if(status !== kakao.maps.services.Status.OK){ hideAcList(); return; }
+    renderAcList(data.slice(0, 6));
+  });
+}
+
+function renderAcList(items){
+  const list = $('#acList');
+  list.innerHTML = items.map(it => `
+    <div class="ac-item" data-name="${escapeHtml(it.place_name)}" data-addr="${escapeHtml(it.road_address_name || it.address_name)}">
+      <b>${escapeHtml(it.place_name)}</b>
+      <span class="addr">${escapeHtml(it.road_address_name || it.address_name)}</span>
+    </div>
+  `).join('');
+  $$('.ac-item').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      $('#f_name').value = el.dataset.name;
+      $('#f_address').value = el.dataset.addr;
+      selectedAddress = el.dataset.addr;
+      hideAcList();
+    });
+  });
+  list.classList.add('show');
+}
+function hideAcList(){ $('#acList').classList.remove('show'); $('#acList').innerHTML=''; }
+
+function escapeHtml(s){
+  return String(s||'').replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+
+function initForm(){
+  $('#recordForm').addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    const status = $('#formStatus');
+
+    if(!selectedCategory){ setStatus('업종을 선택해주세요.', 'err'); return; }
+    if(!$('#f_name').value.trim()){ setStatus('식당이름을 입력해주세요.', 'err'); return; }
+
+    const payload = {
+      action: 'add',
+      data: {
+        timestamp: $('#f_timestamp').value,
+        category: selectedCategory,
+        name: $('#f_name').value.trim(),
+        address: $('#f_address').value.trim(),
+        menu: $('#f_menu').value.trim(),
+        people: $('#f_people').value || '',
+        cost: $('#f_cost').value || '',
+        rating: selectedStar,
+        review: $('#f_review').value.trim(),
+        photoBase64: photoBase64,
+        photoName: (crypto.randomUUID ? crypto.randomUUID() : String(Date.now())) + '.jpg'
+      }
+    };
+
+    if(!CONFIG.GAS_URL || CONFIG.GAS_URL.indexOf('YOUR_') === 0){
+      setStatus('먼저 CONFIG.GAS_URL 을 설정해주세요 (README 참고).', 'err');
+      return;
+    }
+
+    $('#submitBtn').disabled = true;
+    setStatus('저장하는 중...', '');
+    try{
+      await fetch(CONFIG.GAS_URL, {
+        method: 'POST',
+        headers: {'Content-Type':'text/plain;charset=utf-8'},
+        body: JSON.stringify(payload)
+      });
+      setStatus('저장했어요! 🎉', 'ok');
+      resetForm();
+      await fetchRecords();
+    }catch(err){
+      setStatus('저장에 실패했어요. GAS_URL 배포 상태를 확인해주세요.', 'err');
+    }
+    $('#submitBtn').disabled = false;
+  });
+
+  function setStatus(msg, cls){
+    status_el().textContent = msg;
+    status_el().className = 'status-msg' + (cls ? ' '+cls : '');
+  }
+  function status_el(){ return $('#formStatus'); }
+}
+
+function resetForm(){
+  $('#recordForm').reset();
+  $('#f_timestamp').value = toLocalInputValue(new Date());
+  $$('#f_category .segbtn').forEach(b=>b.classList.remove('active'));
+  selectedCategory = '';
+  $$('#f_stars span').forEach(x=>x.classList.remove('filled'));
+  selectedStar = 0;
+  photoBase64 = null;
+  $('#photoPreview').style.display='none';
+  $('#photoDropLabel').textContent = '탭해서 사진 선택 (선택사항)';
+}
+
+/* =========================================================================
+   데이터 fetch
+========================================================================= */
+async function fetchRecords(){
+  if(!CONFIG.GAS_URL || CONFIG.GAS_URL.indexOf('YOUR_') === 0){
+    $('#recentList').innerHTML = '<p class="panel-desc">CONFIG.GAS_URL을 설정하면 기록이 표시됩니다.</p>';
+    return;
+  }
+  try{
+    const res = await fetch(CONFIG.GAS_URL + '?action=list');
+    const data = await res.json();
+    RECORDS = Array.isArray(data) ? data : [];
+    RECORDS.sort((a,b)=> new Date(b['등록일시']) - new Date(a['등록일시']));
+    renderRecentList();
+  }catch(err){
+    $('#recentList').innerHTML = '<p class="panel-desc">불러오기에 실패했어요.</p>';
+  }
+}
+
+function renderRecentList(){
+  const wrap = $('#recentList');
+  if(RECORDS.length === 0){ wrap.innerHTML = '<p class="panel-desc">아직 기록이 없어요. 첫 외식을 기록해보세요!</p>'; return; }
+  wrap.innerHTML = RECORDS.slice(0,5).map(r=>{
+    const img = r['사진URL'] ? `<img src="${r['사진URL']}">` : `<div class="noimg">🍽️</div>`;
+    const stars = '★'.repeat(Number(r['별점'])||0) + '☆'.repeat(5-(Number(r['별점'])||0));
+    return `<div class="mini-card">${img}
+      <div class="info">
+        <div class="name">${escapeHtml(r['식당이름'])} <span class="tag">${escapeHtml(r['업종'])}</span></div>
+        <div class="meta">${formatDate(r['등록일시'])} · ${escapeHtml(r['선택메뉴']||'')} · <span style="color:var(--yolk-deep)">${stars}</span></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function formatDate(v){
+  const d = new Date(v);
+  if(isNaN(d)) return v;
+  return d.toLocaleDateString('ko-KR',{month:'2-digit',day:'2-digit'}) + ' ' + d.toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'});
+}
+
+/* =========================================================================
+   TAB2: 방문이력 대시보드
+========================================================================= */
+function initFilters(){
+  ['filt_category','filt_rating','filt_cost','filt_menu'].forEach(id=>{
+    $('#'+id).addEventListener('input', renderDashboard);
+    $('#'+id).addEventListener('change', renderDashboard);
+  });
+}
+
+function getFilteredRecords(){
+  const cat = $('#filt_category').value;
+  const minRating = Number($('#filt_rating').value);
+  const costRange = $('#filt_cost').value;
+  const menuQ = $('#filt_menu').value.trim().toLowerCase();
+
+  return RECORDS.filter(r=>{
+    if(cat && r['업종'] !== cat) return false;
+    if(minRating && Number(r['별점']||0) < minRating) return false;
+    if(costRange){
+      const [lo,hi] = costRange.split('-').map(Number);
+      const c = Number(r['비용']||0);
+      if(c < lo || c > hi) return false;
+    }
+    if(menuQ && !(String(r['선택메뉴']||'').toLowerCase().includes(menuQ))) return false;
+    return true;
+  });
+}
+
+function renderDashboard(){
+  const filtered = getFilteredRecords();
+  renderStats(filtered);
+  renderCategoryChart(filtered);
+  renderVisitList(filtered);
+}
+
+function renderStats(list){
+  const total = list.length;
+  const totalCost = list.reduce((s,r)=> s + (Number(r['비용'])||0), 0);
+  const avgRating = total ? (list.reduce((s,r)=> s+(Number(r['별점'])||0),0)/total).toFixed(1) : '-';
+  const favCat = topCategory(list);
+  $('#statGrid').innerHTML = `
+    <div class="stat-card"><div class="num">${total}</div><div class="lbl">총 방문</div></div>
+    <div class="stat-card"><div class="num">${totalCost.toLocaleString()}원</div><div class="lbl">누적 지출</div></div>
+    <div class="stat-card"><div class="num">${avgRating}</div><div class="lbl">평균 별점</div></div>
+    <div class="stat-card"><div class="num">${favCat || '-'}</div><div class="lbl">최애 업종</div></div>
+  `;
+}
+
+function topCategory(list){
+  const cnt = {};
+  list.forEach(r=> cnt[r['업종']] = (cnt[r['업종']]||0)+1);
+  let best=null, bestN=0;
+  Object.entries(cnt).forEach(([k,v])=>{ if(v>bestN){best=k;bestN=v;} });
+  return best;
+}
+
+function renderCategoryChart(list){
+  const cats = ['한식','중식','일식','기타'];
+  const cnt = {}; cats.forEach(c=>cnt[c]=0);
+  list.forEach(r=>{ if(cnt[r['업종']] !== undefined) cnt[r['업종']]++; });
+  const max = Math.max(1, ...Object.values(cnt));
+  $('#categoryChart').innerHTML = `<div style="font-size:12.5px;font-weight:700;color:var(--ink-soft);margin-bottom:10px;">업종별 방문 빈도</div>` +
+    cats.map(c=>`
+      <div class="chart-row">
+        <div class="lbl">${c}</div>
+        <div class="bar-bg"><div class="bar-fill" style="width:${(cnt[c]/max*100)}%"></div></div>
+        <div class="val">${cnt[c]}회</div>
+      </div>`).join('');
+}
+
+function renderVisitList(list){
+  const wrap = $('#visitList');
+  if(list.length === 0){
+    wrap.innerHTML = `<div class="empty-state" style="grid-column:1/-1;"><div class="big">🍽️</div>조건에 맞는 기록이 없어요.</div>`;
+    return;
+  }
+  wrap.innerHTML = list.map(r=>{
+    const img = r['사진URL'] ? `<img class="thumb" src="${r['사진URL']}">` : `<div class="noimg-thumb">🍽️</div>`;
+    const stars = '★'.repeat(Number(r['별점'])||0) + '☆'.repeat(5-(Number(r['별점'])||0));
+    return `<div class="visit-card">
+      ${img}
+      <div class="body">
+        <div class="name">${escapeHtml(r['식당이름'])} <span class="tag">${escapeHtml(r['업종'])}</span></div>
+        <div class="stars-mini">${stars}</div>
+        <div class="meta">${formatDate(r['등록일시'])}<br>${escapeHtml(r['선택메뉴']||'-')} · ${escapeHtml(String(r['인원']||'-'))}인 · ${Number(r['비용']||0).toLocaleString()}원</div>
+        ${r['후기'] ? `<div class="review">${escapeHtml(r['후기'])}</div>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+/* =========================================================================
+   TAB3: 랜덤추천 룰렛
+========================================================================= */
+function initRoulette(){
+  $('#buildWheelBtn').addEventListener('click', buildWheel);
+  $('#spinBtn').addEventListener('click', spinWheel);
+}
+
+function buildWheel(){
+  const cat = $('#r_category').value;
+  const maxCost = Number($('#r_cost').value) || Infinity;
+  const minRating = Number($('#r_rating').value);
+
+  const pool = RECORDS.filter(r=>{
+    if(cat && r['업종'] !== cat) return false;
+    if(minRating && Number(r['별점']||0) < minRating) return false;
+    const perPerson = Number(r['비용']||0) / (Number(r['인원'])||1);
+    if(maxCost !== Infinity && perPerson > maxCost) return false;
+    return true;
+  });
+
+  // 식당 이름 기준으로 고유화 (같은 식당의 메뉴 기록은 모아둔다)
+  const map = {};
+  pool.forEach(r=>{
+    const name = r['식당이름'];
+    if(!map[name]) map[name] = { name, category:r['업종'], menus:[] };
+    if(r['선택메뉴']) map[name].menus.push(r['선택메뉴']);
+  });
+  wheelSegments = Object.values(map);
+
+  if(wheelSegments.length === 0){
+    $('#wheelZone').style.display = 'none';
+    $('#rouletteEmpty').innerHTML = `<div class="empty-state"><div class="big">🎡</div>조건에 맞는 외식 기록이 아직 없어요.<br>조건을 조금 넓혀보세요.</div>`;
+    return;
+  }
+  $('#rouletteEmpty').innerHTML = '';
+  $('#wheelZone').style.display = 'flex';
+  $('#resultCard').classList.remove('show');
+  wheelRotation = 0;
+  drawWheel(0);
+}
+
+const WHEEL_COLORS = ['#6B3623','#6E8B5E','#E3A83B','#B5482F','#4F6B42','#C4841E','#8A5A3B','#3F5A34'];
+
+function drawWheel(rotationDeg){
+  const canvas = $('#wheelCanvas');
+  const ctx = canvas.getContext('2d');
+  const n = wheelSegments.length;
+  const r = canvas.width/2;
+  const arc = (2*Math.PI)/n;
+
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.save();
+  ctx.translate(r,r);
+  ctx.rotate(rotationDeg * Math.PI/180);
+
+  wheelSegments.forEach((seg,i)=>{
+    const start = i*arc, end = start+arc;
+    ctx.beginPath();
+    ctx.moveTo(0,0);
+    ctx.arc(0,0,r-4, start, end);
+    ctx.closePath();
+    ctx.fillStyle = WHEEL_COLORS[i % WHEEL_COLORS.length];
+    ctx.fill();
+    ctx.strokeStyle = '#FFFDF9'; ctx.lineWidth=2; ctx.stroke();
+
+    ctx.save();
+    ctx.rotate(start + arc/2);
+    ctx.textAlign = 'right';
+    ctx.fillStyle = '#FFFDF9';
+    ctx.font = '700 12px Pretendard, sans-serif';
+    const label = seg.name.length > 8 ? seg.name.slice(0,7)+'…' : seg.name;
+    ctx.fillText(label, r-16, 4);
+    ctx.restore();
+  });
+  ctx.restore();
+}
+
+function spinWheel(){
+  if(spinning || wheelSegments.length === 0) return;
+  spinning = true;
+  $('#resultCard').classList.remove('show');
+  $('#spinBtn').disabled = true;
+
+  const n = wheelSegments.length;
+  const arcDeg = 360/n;
+  const winnerIndex = Math.floor(Math.random()*n);
+  // 포인터는 상단(0도) 고정. 당첨 조각의 중앙이 상단에 오도록 목표 각도를 계산.
+  const targetSegCenter = winnerIndex*arcDeg + arcDeg/2;
+  const extraSpins = 5*360;
+  const finalRotation = wheelRotation - (wheelRotation % 360) + extraSpins + (360 - targetSegCenter);
+
+  const duration = 4200;
+  const startRotation = wheelRotation;
+  const delta = finalRotation - startRotation;
+  const startTime = performance.now();
+
+  function animate(now){
+    const t = Math.min(1, (now-startTime)/duration);
+    const eased = 1 - Math.pow(1-t, 4); // ease-out
+    wheelRotation = startRotation + delta*eased;
+    drawWheel(wheelRotation);
+    if(t < 1){
+      requestAnimationFrame(animate);
+    }else{
+      spinning = false;
+      $('#spinBtn').disabled = false;
+      showResult(wheelSegments[winnerIndex]);
+    }
+  }
+  requestAnimationFrame(animate);
+}
+
+function showResult(seg){
+  const menu = seg.menus.length ? seg.menus[Math.floor(Math.random()*seg.menus.length)] : '메뉴 기록 없음 · 가서 직접 골라보세요';
+  $('#resultName').textContent = '오늘은 "' + seg.name + '" 어때요?';
+  $('#resultMenu').textContent = menu;
+  $('#resultMeta').textContent = seg.category + ' · 기록 ' + seg.menus.length + '건 참고';
+  $('#resultCard').classList.add('show');
+}
+</script>
+</body>
+</html>
