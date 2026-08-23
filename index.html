@@ -9,7 +9,7 @@
 <script>
   const CONFIG = {
     // Google Apps Script를 '웹 앱'으로 배포한 뒤 나오는 URL을 붙여넣으세요.
-    GAS_URL: 'https://script.google.com/macros/s/AKfycbyzpchhFb94joh7j9hDz64hkotlMqzWQx7fvP0YfsMZyG_76MRYAzwmzz2UtXuvRPNHfQ/exec',
+    GAS_URL: 'https://script.google.com/macros/s/AKfycbxK-CKbwQTMPveL6aRvkU0BqG_jjfOXrYR-HB05ckJMwyCOblyT1Q36U69QoXRZsB7l/exec',
     // 카카오 개발자센터에서 발급받은 JavaScript 키를 붙여넣으세요.
     KAKAO_JS_KEY: 'af1f4fec3223edd131088bb21fbbcf01'
   };
@@ -106,14 +106,22 @@
   /* -------- form -------- */
   .field{margin-bottom:16px;}
   .field label{display:block; font-size:12.5px; font-weight:700; color:var(--ink-soft); margin-bottom:6px; letter-spacing:.01em;}
-  .row2{display:grid; grid-template-columns:1fr 1fr; gap:14px;}
-  .row3{display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px;}
-  @media (max-width:560px){ .row2,.row3{grid-template-columns:1fr;} }
+  .row2{display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:14px;}
+  .row3{display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1fr); gap:14px;}
+  @media (max-width:560px){ .row2,.row3{grid-template-columns:minmax(0,1fr);} }
+  .field{min-width:0;}
 
   input[type=text], input[type=number], input[type=datetime-local], textarea, select{
-    width:100%; padding:10px 12px; border:1.5px solid var(--line); border-radius:8px;
+    width:100%; min-width:0; max-width:100%; padding:10px 12px; border:1.5px solid var(--line); border-radius:8px;
     background:#fff; font-family:inherit; font-size:14px; color:var(--ink);
     outline:none; transition:border-color .15s ease;
+  }
+  /* datetime-local의 내부 위젯은 자체 최소폭을 갖고 있어 좁은 화면에서 넘칠 수 있으므로 별도 보정 */
+  input[type=datetime-local]{
+    font-size:13px;
+  }
+  @media (max-width:380px){
+    input[type=datetime-local]{ font-size:12px; padding:10px 8px; }
   }
   input:focus, textarea:focus, select:focus{border-color:var(--soy);}
   textarea{resize:vertical; min-height:70px;}
@@ -301,6 +309,7 @@
           <label>식당이름 <span style="font-weight:400;color:var(--ink-soft);">(입력하면 근처 식당을 찾아드려요)</span></label>
           <input type="text" id="f_name" placeholder="예: 행복분식" autocomplete="off" required>
           <div class="ac-list" id="acList"></div>
+          <div id="addressHint" style="display:none; font-size:11.5px; color:var(--danger); margin-top:6px;"></div>
         </div>
 
         <div class="field">
@@ -448,7 +457,7 @@ const $$ = (sel) => Array.from(document.querySelectorAll(sel));
    초기화
 ========================================================================= */
 document.addEventListener('DOMContentLoaded', () => {
-  $('#todayLabel').textContent = new Date().toLocaleDateString('ko-KR', {year:'numeric',month:'long',day:'numeric',weekday:'short'});
+  $('#todayLabel').textContent = formatTodayLabel(new Date());
   $('#f_timestamp').value = toLocalInputValue(new Date());
 
   initTabs();
@@ -479,6 +488,11 @@ function initTabs(){
 function toLocalInputValue(d){
   const pad = n => String(n).padStart(2,'0');
   return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+'T'+pad(d.getHours())+':'+pad(d.getMinutes());
+}
+
+function formatTodayLabel(d){
+  const weekdays = ['일','월','화','수','목','금','토'];
+  return d.getFullYear() + '년 ' + (d.getMonth()+1) + '월 ' + d.getDate() + '일 (' + weekdays[d.getDay()] + '요일)';
 }
 
 /* =========================================================================
@@ -550,23 +564,65 @@ function initAddressAutocomplete(){
   });
 }
 
+let kakaoReady = false;
+
 function loadKakaoSdk(){
-  if(!CONFIG.KAKAO_JS_KEY || CONFIG.KAKAO_JS_KEY.indexOf('YOUR_') === 0) return;
+  if(!CONFIG.KAKAO_JS_KEY || CONFIG.KAKAO_JS_KEY.indexOf('YOUR_') === 0){
+    setAddressHint('카카오 JavaScript 키가 설정되지 않았어요. CONFIG.KAKAO_JS_KEY를 채워주세요. (주소는 직접 입력할 수 있어요)');
+    return;
+  }
   const script = document.createElement('script');
   script.src = 'https://dapi.kakao.com/v2/maps/sdk.js?appkey=' + CONFIG.KAKAO_JS_KEY + '&libraries=services&autoload=false';
-  script.onload = ()=> kakao.maps.load(()=>{ /* ready */ });
+  script.onload = ()=>{
+    try{
+      kakao.maps.load(()=>{
+        kakaoReady = true;
+        clearAddressHint();
+        console.log('[카카오 SDK] 로드 및 초기화 완료');
+      });
+    }catch(err){
+      console.error('[카카오 SDK] 초기화 실패', err);
+      setAddressHint('카카오 지도 초기화에 실패했어요. 콘솔(F12) 로그를 확인해주세요.');
+    }
+  };
+  script.onerror = ()=>{
+    console.error('[카카오 SDK] 스크립트 로드 실패 - JavaScript 키 또는 네트워크를 확인하세요.');
+    setAddressHint('카카오 지도 스크립트를 불러오지 못했어요. JS 키가 올바른지 확인해주세요.');
+  };
   document.head.appendChild(script);
 }
 
 function searchPlaces(query){
   if(typeof kakao === 'undefined' || !kakao.maps || !kakao.maps.services){
-    return; // 카카오 SDK 미설정 시 자동완성 없이 수동 입력만 지원
+    console.warn('[카카오 SDK] 아직 준비되지 않았습니다 (kakaoReady=' + kakaoReady + '). 키/도메인 등록/네트워크를 확인하세요.');
+    setAddressHint('자동완성을 사용할 수 없어요. 카카오 개발자센터의 Web 플랫폼에 현재 접속 주소가 등록되어 있는지 확인해주세요. (주소는 직접 입력 가능)');
+    return;
   }
   const places = new kakao.maps.services.Places();
   places.keywordSearch(query, (data, status)=>{
-    if(status !== kakao.maps.services.Status.OK){ hideAcList(); return; }
+    if(status === kakao.maps.services.Status.ZERO_RESULT){
+      hideAcList();
+      setAddressHint('검색 결과가 없어요. 다른 이름으로 검색하거나 주소를 직접 입력해주세요.');
+      return;
+    }
+    if(status !== kakao.maps.services.Status.OK){
+      console.warn('[카카오 검색] 실패 status =', status, '(도메인 등록/키 종류를 확인하세요)');
+      hideAcList();
+      setAddressHint('주소 검색에 실패했어요. Web 플랫폼 도메인 등록 상태를 확인해주세요.');
+      return;
+    }
+    clearAddressHint();
     renderAcList(data.slice(0, 6));
   });
+}
+
+function setAddressHint(msg){
+  const el = document.getElementById('addressHint');
+  if(el){ el.textContent = msg; el.style.display = 'block'; }
+}
+function clearAddressHint(){
+  const el = document.getElementById('addressHint');
+  if(el){ el.style.display = 'none'; }
 }
 
 function renderAcList(items){
