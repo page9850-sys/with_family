@@ -228,6 +228,75 @@
   .visit-card .stars-mini{color:var(--yolk); font-size:13px; margin:4px 0;}
   .visit-card .meta{font-size:12px; color:var(--ink-soft); line-height:1.6;}
   .visit-card .review{font-size:12.5px; margin-top:6px; color:var(--ink); background:var(--paper); padding:8px; border-radius:6px;}
+  .gallery-btn{
+    margin-top:8px; padding:6px 10px; border-radius:999px; border:1.5px solid var(--sage);
+    background:#fff; color:var(--sage-deep); font-size:11.5px; font-weight:700; cursor:pointer;
+  }
+  .gallery-btn:hover{background:#F1F6EE;}
+
+  /* -------- calendar (tab2) -------- */
+  .calendar-wrap{background:var(--paper-deep); border-radius:12px; padding:16px; margin-bottom:26px;}
+  .cal-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;}
+  .cal-head .cal-title{font-family:'Gowun Batang',serif; font-weight:700; font-size:15px; color:var(--ink);}
+  .cal-navbtn{
+    width:28px; height:28px; border-radius:8px; border:1.5px solid var(--line); background:#fff;
+    cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:13px; color:var(--ink-soft);
+  }
+  .cal-navbtn:hover{background:var(--paper);}
+  .cal-grid{display:grid; grid-template-columns:repeat(7,1fr); gap:4px;}
+  .cal-dow{text-align:center; font-size:11px; font-weight:700; color:var(--ink-soft); padding-bottom:4px;}
+  .cal-cell{
+    aspect-ratio:1/1; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    border-radius:8px; font-size:12px; color:var(--ink-soft); position:relative; gap:2px;
+  }
+  .cal-cell.empty{visibility:hidden;}
+  .cal-cell.today{border:1.5px solid var(--soy);}
+  .cal-cell.has-visit{background:#fff; color:var(--ink); font-weight:700; cursor:pointer;}
+  .cal-cell.has-visit:hover{background:#FBF0E9;}
+  .cal-cell.selected{outline:2px solid var(--soy); outline-offset:-1px; background:#fff;}
+  .cal-cell .dot{width:5px; height:5px; border-radius:50%; background:var(--soy);}
+
+  .date-chip{
+    display:inline-flex; align-items:center; gap:8px; background:var(--soy); color:#fff;
+    padding:7px 12px; border-radius:999px; font-size:12.5px; font-weight:700; margin-bottom:14px;
+  }
+  .date-chip button{background:transparent; border:none; color:#fff; cursor:pointer; font-size:13px; padding:0; line-height:1;}
+
+  /* -------- gallery / lightbox modals -------- */
+  .modal-overlay{
+    position:fixed; inset:0; background:rgba(42,35,32,.55); z-index:100;
+    display:none; align-items:center; justify-content:center; padding:20px;
+  }
+  .modal-overlay.show{display:flex;}
+  .gallery-modal{
+    background:var(--card); border-radius:14px; max-width:480px; width:100%; max-height:80vh;
+    overflow-y:auto; padding:20px; position:relative;
+  }
+  .gallery-modal h3{font-family:'Gowun Batang',serif; margin:0 0 4px; font-size:17px;}
+  .gallery-modal .sub{font-size:12px; color:var(--ink-soft); margin-bottom:14px;}
+  .gallery-modal .close-x{
+    position:absolute; top:14px; right:14px; width:28px; height:28px; border-radius:50%;
+    border:none; background:var(--paper-deep); cursor:pointer; font-size:15px; color:var(--ink-soft);
+  }
+  .gallery-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:14px;}
+  .gallery-thumb{width:100%; aspect-ratio:1/1; object-fit:cover; border-radius:8px; cursor:pointer; background:var(--paper-deep);}
+  .gallery-add{
+    border:1.5px dashed var(--line); border-radius:8px; text-align:center; padding:14px;
+    font-size:12.5px; color:var(--ink-soft); cursor:pointer;
+  }
+  .gallery-add:hover{background:var(--paper);}
+  .gallery-empty{font-size:12.5px; color:var(--ink-soft); text-align:center; padding:14px 0; grid-column:1/-1;}
+
+  .lightbox-overlay{
+    position:fixed; inset:0; background:rgba(0,0,0,.85); z-index:200;
+    display:none; align-items:center; justify-content:center; padding:20px;
+  }
+  .lightbox-overlay.show{display:flex;}
+  .lightbox-overlay img{max-width:100%; max-height:90vh; border-radius:8px;}
+  .lightbox-overlay .close-x{
+    position:absolute; top:18px; right:18px; width:34px; height:34px; border-radius:50%;
+    border:none; background:rgba(255,255,255,.15); color:#fff; font-size:18px; cursor:pointer;
+  }
 
   .empty-state{text-align:center; padding:40px 10px; color:var(--ink-soft);}
   .empty-state .big{font-size:34px; margin-bottom:8px;}
@@ -390,6 +459,9 @@
 
       <div class="chart-wrap" id="categoryChart"></div>
 
+      <div class="calendar-wrap" id="calendarWrap"></div>
+
+      <div id="dateFilterChip"></div>
       <div class="visit-list" id="visitList"></div>
     </section>
 
@@ -437,6 +509,25 @@
   <footer class="app-foot">가족 외식 기록 · Google Sheets에 안전하게 저장돼요</footer>
 </div>
 
+<!-- 그날의 갤러리 모달 -->
+<div class="modal-overlay" id="galleryOverlay">
+  <div class="gallery-modal">
+    <button class="close-x" id="galleryCloseBtn">✕</button>
+    <h3 id="galleryTitle"></h3>
+    <div class="sub" id="gallerySub"></div>
+    <div class="gallery-grid" id="galleryGrid"></div>
+    <div class="gallery-add" id="galleryAddBtn">📎 탭해서 사진 추가</div>
+    <input type="file" accept="image/*" id="galleryFileInput" style="display:none" multiple>
+    <div class="status-msg" id="galleryStatus"></div>
+  </div>
+</div>
+
+<!-- 사진 확대보기 -->
+<div class="lightbox-overlay" id="lightboxOverlay">
+  <button class="close-x" id="lightboxCloseBtn">✕</button>
+  <img id="lightboxImg" src="">
+</div>
+
 <script>
 /* =========================================================================
    상태
@@ -468,6 +559,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initForm();
   initFilters();
   initRoulette();
+  initGallery();
   loadKakaoSdk();
 
   fetchRecords();
@@ -657,9 +749,11 @@ function initForm(){
     if(!selectedCategory){ setStatus('업종을 선택해주세요.', 'err'); return; }
     if(!$('#f_name').value.trim()){ setStatus('식당이름을 입력해주세요.', 'err'); return; }
 
+    const recordId = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2));
     const payload = {
       action: 'add',
       data: {
+        id: recordId,
         timestamp: $('#f_timestamp').value,
         category: selectedCategory,
         name: $('#f_name').value.trim(),
@@ -670,7 +764,7 @@ function initForm(){
         rating: selectedStar,
         review: $('#f_review').value.trim(),
         photoBase64: photoBase64,
-        photoName: (crypto.randomUUID ? crypto.randomUUID() : String(Date.now())) + '.jpg'
+        photoName: recordId + '.jpg'
       }
     };
 
@@ -788,7 +882,30 @@ function renderDashboard(){
   const filtered = getFilteredRecords();
   renderStats(filtered);
   renderCategoryChart(filtered);
-  renderVisitList(filtered);
+  renderCalendar(filtered);
+  renderDateChip();
+  renderVisitList(applyDateFilter(filtered));
+}
+
+function applyDateFilter(list){
+  if(!calSelectedDate) return list;
+  return list.filter(r=>{
+    const d = new Date(r['등록일시']);
+    return !isNaN(d) && d.getFullYear() === calSelectedDate.getFullYear()
+      && d.getMonth() === calSelectedDate.getMonth()
+      && d.getDate() === calSelectedDate.getDate();
+  });
+}
+
+function renderDateChip(){
+  const wrap = $('#dateFilterChip');
+  if(!calSelectedDate){ wrap.innerHTML = ''; return; }
+  const label = (calSelectedDate.getMonth()+1) + '월 ' + calSelectedDate.getDate() + '일에 외식한 기록만 보는 중';
+  wrap.innerHTML = `<div class="date-chip">${label} <button id="clearDateFilterBtn">✕</button></div>`;
+  $('#clearDateFilterBtn').addEventListener('click', ()=>{
+    calSelectedDate = null;
+    renderDashboard();
+  });
 }
 
 function renderStats(list){
@@ -835,16 +952,175 @@ function renderVisitList(list){
   wrap.innerHTML = list.map(r=>{
     const img = r['사진URL'] ? `<img class="thumb" src="${r['사진URL']}">` : `<div class="noimg-thumb">🍽️</div>`;
     const stars = '★'.repeat(Number(r['별점'])||0) + '☆'.repeat(5-(Number(r['별점'])||0));
+    const recId = r['ID'] || '';
+    const dateLabel = formatDate(r['등록일시']);
     return `<div class="visit-card">
       ${img}
       <div class="body">
         <div class="name">${escapeHtml(r['식당이름'])} <span class="tag">${escapeHtml(r['업종'])}</span></div>
         <div class="stars-mini">${stars}</div>
-        <div class="meta">${formatDate(r['등록일시'])}<br>${escapeHtml(r['선택메뉴']||'-')} · ${escapeHtml(String(r['인원']||'-'))}인 · ${Number(r['비용']||0).toLocaleString()}원</div>
+        <div class="meta">${dateLabel}<br>${escapeHtml(r['선택메뉴']||'-')} · ${escapeHtml(String(r['인원']||'-'))}인 · ${Number(r['비용']||0).toLocaleString()}원</div>
         ${r['후기'] ? `<div class="review">${escapeHtml(r['후기'])}</div>` : ''}
+        <button class="gallery-btn" data-id="${escapeHtml(recId)}" data-name="${escapeHtml(r['식당이름'])}" data-date="${escapeHtml(dateLabel)}">📷 그날의 갤러리</button>
       </div>
     </div>`;
   }).join('');
+  $$('.gallery-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=> openGallery(btn.dataset.id, btn.dataset.name, btn.dataset.date));
+  });
+}
+
+/* =========================================================================
+   TAB2: 이달의 달력
+========================================================================= */
+let calMonthDate = new Date();
+let calSelectedDate = null;
+
+function renderCalendar(list){
+  const wrap = $('#calendarWrap');
+  const y = calMonthDate.getFullYear(), m = calMonthDate.getMonth();
+  const firstDow = new Date(y, m, 1).getDay();
+  const daysInMonth = new Date(y, m+1, 0).getDate();
+  const todayStr = new Date().toDateString();
+
+  const visitDays = new Set();
+  list.forEach(r=>{
+    const d = new Date(r['등록일시']);
+    if(!isNaN(d) && d.getFullYear() === y && d.getMonth() === m) visitDays.add(d.getDate());
+  });
+
+  const dowLabels = ['일','월','화','수','목','금','토'];
+  let cells = '';
+  for(let i=0;i<firstDow;i++) cells += `<div class="cal-cell empty"></div>`;
+  for(let day=1; day<=daysInMonth; day++){
+    const isToday = new Date(y, m, day).toDateString() === todayStr;
+    const hasVisit = visitDays.has(day);
+    const isSelected = !!(calSelectedDate && calSelectedDate.getFullYear()===y && calSelectedDate.getMonth()===m && calSelectedDate.getDate()===day);
+    cells += `<div class="cal-cell${isToday?' today':''}${hasVisit?' has-visit':''}${isSelected?' selected':''}"${hasVisit?` data-day="${day}"`:''}>
+      <span>${day}</span>${hasVisit ? '<span class="dot"></span>' : ''}
+    </div>`;
+  }
+
+  wrap.innerHTML = `
+    <div class="cal-head">
+      <button class="cal-navbtn" id="calPrevBtn">‹</button>
+      <div class="cal-title">${y}년 ${m+1}월 · 외식한 날 (탭하면 그날 기록만 보기)</div>
+      <button class="cal-navbtn" id="calNextBtn">›</button>
+    </div>
+    <div class="cal-grid">
+      ${dowLabels.map(d=>`<div class="cal-dow">${d}</div>`).join('')}
+      ${cells}
+    </div>
+  `;
+  $('#calPrevBtn').addEventListener('click', ()=>{ calMonthDate = new Date(y, m-1, 1); calSelectedDate = null; renderDashboard(); });
+  $('#calNextBtn').addEventListener('click', ()=>{ calMonthDate = new Date(y, m+1, 1); calSelectedDate = null; renderDashboard(); });
+  $$('.cal-cell[data-day]').forEach(cell=>{
+    cell.addEventListener('click', ()=>{
+      const day = Number(cell.dataset.day);
+      const already = calSelectedDate && calSelectedDate.getFullYear()===y && calSelectedDate.getMonth()===m && calSelectedDate.getDate()===day;
+      calSelectedDate = already ? null : new Date(y, m, day);
+      renderDashboard();
+      $('#visitList').scrollIntoView({behavior:'smooth', block:'start'});
+    });
+  });
+}
+
+/* =========================================================================
+   TAB2: 그날의 갤러리 (추가사진 · 구글드라이브)
+========================================================================= */
+let currentGalleryRecordId = null;
+
+function initGallery(){
+  $('#galleryCloseBtn').addEventListener('click', closeGallery);
+  $('#galleryOverlay').addEventListener('click', (e)=>{ if(e.target.id === 'galleryOverlay') closeGallery(); });
+  $('#lightboxCloseBtn').addEventListener('click', closeLightbox);
+  $('#lightboxOverlay').addEventListener('click', (e)=>{ if(e.target.id === 'lightboxOverlay') closeLightbox(); });
+  $('#galleryAddBtn').addEventListener('click', ()=> $('#galleryFileInput').click());
+  $('#galleryFileInput').addEventListener('change', onGalleryFilesSelected);
+}
+
+function openGallery(recordId, name, dateLabel){
+  currentGalleryRecordId = recordId;
+  $('#galleryTitle').textContent = name;
+  $('#gallerySub').textContent = dateLabel + '에 찍은 사진들';
+  $('#galleryStatus').textContent = '';
+  $('#galleryOverlay').classList.add('show');
+  loadGalleryPhotos(recordId);
+}
+
+function closeGallery(){
+  $('#galleryOverlay').classList.remove('show');
+  currentGalleryRecordId = null;
+}
+
+function openLightbox(url){
+  $('#lightboxImg').src = url;
+  $('#lightboxOverlay').classList.add('show');
+}
+
+function closeLightbox(){
+  $('#lightboxOverlay').classList.remove('show');
+  $('#lightboxImg').src = '';
+}
+
+async function loadGalleryPhotos(recordId){
+  const grid = $('#galleryGrid');
+  if(!recordId){
+    grid.innerHTML = '<div class="gallery-empty">이 기록은 갤러리 ID가 없어요. (이 기능을 추가한 이후에 저장한 기록부터 사용할 수 있어요)</div>';
+    return;
+  }
+  grid.innerHTML = '<div class="gallery-empty">불러오는 중...</div>';
+  try{
+    const res = await fetch(CONFIG.GAS_URL + '?action=listPhotos&recordId=' + encodeURIComponent(recordId));
+    const urls = await res.json();
+    renderGalleryGrid(Array.isArray(urls) ? urls : []);
+  }catch(err){
+    grid.innerHTML = '<div class="gallery-empty">불러오기에 실패했어요.</div>';
+  }
+}
+
+function renderGalleryGrid(urls){
+  const grid = $('#galleryGrid');
+  if(urls.length === 0){
+    grid.innerHTML = '<div class="gallery-empty">아직 추가 사진이 없어요.</div>';
+    return;
+  }
+  grid.innerHTML = urls.map(u => `<img class="gallery-thumb" src="${u}">`).join('');
+  $$('.gallery-thumb').forEach(img=>{
+    img.addEventListener('click', ()=> openLightbox(img.src));
+  });
+}
+
+async function onGalleryFilesSelected(e){
+  const files = Array.from(e.target.files || []);
+  if(files.length === 0 || !currentGalleryRecordId) return;
+  $('#galleryStatus').textContent = '업로드하는 중... (' + files.length + '장)';
+
+  for(const file of files){
+    await new Promise(resolve=>{
+      resizeImageToBase64(file, 1280, async (dataUrl)=>{
+        try{
+          await fetch(CONFIG.GAS_URL, {
+            method: 'POST',
+            headers: {'Content-Type':'text/plain;charset=utf-8'},
+            body: JSON.stringify({
+              action: 'addPhoto',
+              data: {
+                recordId: currentGalleryRecordId,
+                photoBase64: dataUrl,
+                photoName: (crypto.randomUUID ? crypto.randomUUID() : String(Date.now())) + '.jpg'
+              }
+            })
+          });
+        }catch(err){ /* 개별 실패는 넘어가고 나머지는 계속 진행 */ }
+        resolve();
+      });
+    });
+  }
+
+  $('#galleryStatus').textContent = '업로드 완료! 🎉';
+  $('#galleryFileInput').value = '';
+  loadGalleryPhotos(currentGalleryRecordId);
 }
 
 /* =========================================================================
